@@ -1,7 +1,7 @@
 {% extends 'shared/base_dashboard.html' %}
 {% load static %}
 
-{% block title %}View Ticket{% endblock %}
+{% block title %}View Ticket #{{ ticket.id }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -64,48 +64,64 @@
 {% block main_content %}
 <div class="card border-light shadow-sm pb-3 m-3">
     <div class="top_section mt-1 d-flex shadow-sm align-items-start justify-content-between">
-        <div class="px-4 py-3">
-            <h5 class="ticket_no"></h5>
-            <h3 class="ticket_name"></h3>
-            <p class="ticket_info mb-0 text-secondary"></p>
-        </div>
-        <div class="align-self-center me-2">
-            <div class="btn-group dropdown-btnsubmit"></div>
+        <div class="p-4 h5 m-0 text-primary">Ticket #{{ ticket.id }}</div>
+        <div class="p-4">
+            <span class="badge bg-{{ ticket.get_status_display|lower }}">{{ ticket.get_status_display }}</span>
         </div>
     </div>
 
-    <div class="main_wrapper">
-        <div class="main_block_ta border border-light rounded-2">
-            <div class="comment_section">
-                <ul class="nav comment_tabs" id="myTab" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link small active" onclick="changeeditor(0, this);">Public reply</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link small" onclick="changeeditor(1, this);">Internal note</a>
-                    </li>
-                </ul>
-                <div class="comment_area">
-                    <textarea id="txtDescription" class="comment_input"></textarea>
-                    <div class="attachment_block">
-                        <label class="attachment">
-                            <input type="file" style="display:none;" multiple>
-                            <span class="material-symbols-outlined" onclick="fnInv(this);">attach_file</span>
-                        </label>
-                    </div>
-                </div>
-                <span id="spndescerror" class="text-danger" style="display:none;"></span>
-                <progress id="fileProgress" style="display:none"></progress>
-                <div id="divattachment" style="display:inline-block"></div>
-            </div>
-            <div class="thread_section" id="divData"></div>
+    <div class="ticket-details p-4">
+        <h4>{{ ticket.subject }}</h4>
+        <div class="ticket-meta text-muted mb-3">
+            <small>Created by {{ ticket.created_by.username }} on {{ ticket.created_at|date:"M d, Y H:i" }}</small>
+            <br>
+            <small>Priority: {{ ticket.priority }}</small>
+            {% if ticket.brand %}
+            <br>
+            <small>Brand: {{ ticket.brand }}</small>
+            {% endif %}
         </div>
+
+        <div class="ticket-description mb-4">
+            {{ ticket.description|safe }}
+        </div>
+
+        {% if attachments %}
+        <div class="attachments mb-4">
+            <h5>Attachments</h5>
+            <ul class="list-unstyled">
+                {% for attachment in attachments %}
+                <li>
+                    <a href="{{ attachment.file.url }}" target="_blank">
+                        <i class="fas fa-paperclip"></i> {{ attachment.file_name }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if comments %}
+        <div class="comments">
+            <h5>Comments</h5>
+            {% for comment in comments %}
+            <div class="comment card mb-3">
+                <div class="card-body">
+                    <div class="comment-meta text-muted mb-2">
+                        <small>{{ comment.user.username }} commented on {{ comment.created_at|date:"M d, Y H:i" }}</small>
+                    </div>
+                    {{ comment.comment|safe }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'assets/js/ckeditor/ckeditor.js' %}"></script>
+<script src="{% static 'assets/Scripts/ckeditor/ckeditor.js' %}"></script>
 <script>
 // ...existing JavaScript code...
 </script>

@@ -250,19 +250,22 @@ class UserProfile(models.Model):
     is_email_verified = models.BooleanField(default=False)
 
 class Ticket(models.Model):
-    STATUS_CHOICES = (
-        (1, 'Open'),
+    STATUS_CHOICES = [
+        (1, 'New'),
         (2, 'In Progress'),
-        (3, 'Closed'),
-    )
+        (3, 'Pending'),
+        (4, 'Resolved'),
+        (5, 'Closed'),
+    ]
     
     PRIORITY_CHOICES = (
-        ('L', 'Low'),
-        ('M', 'Medium'),
-        ('H', 'High'),
+        ('Low', 'Low'),
+        ('Medium', 'Medium'),
+        ('High', 'High'),
+        ('Critical', 'Critical')
     )
 
-    ticket_id = models.AutoField(primary_key=True)
+    id = models.AutoField(primary_key=True)  # Changed from ticket_id
     subject = models.CharField(max_length=200)
     description = models.TextField()
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_tickets')
@@ -270,7 +273,7 @@ class Ticket(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     status = models.IntegerField(choices=STATUS_CHOICES, default=1)
-    priority = models.CharField(max_length=1, choices=PRIORITY_CHOICES, default='M')
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='Medium')
     brand = models.CharField(max_length=100, blank=True)
     ccs = models.TextField(blank=True)
 

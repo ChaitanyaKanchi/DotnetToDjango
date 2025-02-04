@@ -1,0 +1,40 @@
+{% extends 'shared/base_dashboard.html' %}
+{% load static %}
+
+{% block title %}All Ticket{% endblock %}
+
+{% block main_content %}
+<div class="container mt-4">
+    <h2 class="text-primary">Ticket List</h2>
+    <table class="table table-bordered mt-3">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>Subject</th>
+                <th>Description</th>
+                <th>Assignee</th>
+                <th>Priority</th>
+                <th>Brand</th>
+                <th>Created At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ticket in tickets %}
+            <tr>
+                <td>{{ ticket.id }}</td>
+                <td>{{ ticket.subject }}</td>
+                <td>{{ ticket.description }}</td>
+                <td>{{ ticket.assignee }}</td>
+                <td>{{ ticket.priority }}</td>
+                <td>{{ ticket.brand }}</td>
+                <td>{{ ticket.created_at }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center">No tickets found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

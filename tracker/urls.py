@@ -14,6 +14,7 @@ urlpatterns = [
     path('new-account/', views.new_account, name='new_account'),
 
     # Ticket URLs
+    path('tickets/', views.all_tickets, name='all_tickets'),  # Use a proper view name
     path('ticket/new/', views.new_ticket, name='new_ticket'),
     path('tickets/all/', views.all_tickets, name='all_tickets'),
     path('tickets/search/', views.advanced_search, name='advanced_search'),

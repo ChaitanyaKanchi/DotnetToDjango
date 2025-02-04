@@ -18,7 +18,7 @@ import json
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 import jwt
-from .models import PasswordResetToken, Ticket, UserProfile
+from .models import PasswordResetToken, Ticket, UserProfile, TicketAttachment, UserSettingsModel
 from .decorators import login_required_with_message, role_required, superuser_required
 from django.views.generic import TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -178,29 +178,6 @@ def validate_password(password):
         return False
     return True
 
-
-# def reset_password(request, token):
-#     user = verify_password_reset_token(token)
-#     if not user:
-#         messages.error(request, "Invalid or expired password reset link.")
-#         return redirect("login")
-    
-#     if request.method == "POST":
-#         new_password = request.POST.get("new_password")
-#         confirm_password = request.POST.get("confirm_password")
-        
-#         if new_password != confirm_password:
-#             messages.error(request, "Passwords do not match.")
-#         else:
-#             user.set_password(new_password)
-#             user.save()
-#             # Delete the used token
-#             PasswordResetToken.objects.filter(user=user).delete()
-#             messages.success(request, "Password has been reset successfully. Please login with your new password.")
-#             return redirect("login")
-    
-#     return render(request, "registration/reset_password.html", {"token": token})
-
 @login_required_with_message
 def change_password(request):
     if request.method == "POST":
@@ -300,14 +277,73 @@ def new_account(request):
 #  this are Tcikets control views
 @login_required_with_message
 def new_ticket(request):
-    return render(request, "tickets/new_ticket.html")
+    if request.method == "POST":
+        try:
+            # Extract data from POST
+            subject = request.POST.get("subject")
+            description = request.POST.get("description")
+            assignee_value = request.POST.get("assignee")
+            priority = request.POST.get("priority", "Medium")
+            brand = request.POST.get("brand", "")
+            
+            # Validate required fields
+            if not subject or not description or not assignee_value:
+                messages.error(request, "Please fill all required fields")
+                return redirect("new_ticket")
+
+            # Handle assignee logic
+            if assignee_value == "me":
+                assignee = request.user
+            elif assignee_value == "team":
+                assignee = None  # Handle team assignment as needed
+            elif assignee_value == "admin":
+                assignee = User.objects.filter(is_superuser=True).first()
+            else:
+                try:
+                    assignee = User.objects.get(id=assignee_value)
+                except User.DoesNotExist:
+                    assignee = None
+
+            # Create ticket
+            ticket = Ticket.objects.create(
+                subject=subject,
+                description=description,
+                created_by=request.user,
+                assigned_to=assignee,
+                priority=priority,
+                brand=brand,
+                status=1
+            )
+
+            # Handle file attachments
+            files = request.FILES.getlist('attachments')
+            for file in files:
+                TicketAttachment.objects.create(
+                    ticket=ticket,
+                    file=file,
+                    file_name=file.name,
+                    uploaded_by=request.user
+                )
+
+            messages.success(request, f"Ticket #{ticket.id} created successfully")
+            return redirect("view_ticket", ticket_id=ticket.id)
+
+        except Exception as e:
+            messages.error(request, f"Error creating ticket: {str(e)}")
+            return redirect("new_ticket")
+
+    # GET request
+    context = {
+        'users': User.objects.filter(is_active=True).exclude(id=request.user.id)
+    }
+    return render(request, "tickets/new_ticket.html", context)
 
 @login_required_with_message
 def all_tickets(request):
-    with connection.cursor() as cursor:
-        cursor.execute("EXEC dbo._sp_select_dashboardTicket", [request.user.id])
-        results = dictfetchall(cursor)
-    return JsonResponse(results, safe=False)
+    tickets = Ticket.objects.all()  # Fetch all tickets
+
+    return render(request, "tracker/all_tickets.html", {"tickets": tickets})
+
 
 @login_required_with_message
 def advanced_search(request):
@@ -318,9 +354,33 @@ def advanced_search(request):
         results = dictfetchall(cursor)
     return JsonResponse(results, safe=False)
 
-@role_required([1, 2])  # Allow roles 1 and 2
+@login_required_with_message  # Remove role_required decorator for now
 def view_ticket(request, ticket_id):
-    return render(request, "tickets/view_ticket.html", {"ticket_id": ticket_id})
+    try:
+        ticket = Ticket.objects.get(id=ticket_id)
+        
+        # Check if user has permission to view this ticket
+        if not (request.user.is_superuser or 
+                ticket.created_by == request.user or 
+                ticket.assigned_to == request.user):
+            messages.error(request, "You don't have permission to view this ticket.")
+            return redirect('dashboard')
+            
+        attachments = TicketAttachment.objects.filter(ticket=ticket)
+        comments = ticket.comments.all().order_by('-created_at')
+
+        context = {
+            'ticket': ticket,
+            'attachments': attachments,
+            'comments': comments,
+            'status_choices': Ticket.STATUS_CHOICES,
+            'priority_choices': Ticket.PRIORITY_CHOICES,
+            'can_edit': request.user.is_superuser or ticket.assigned_to == request.user
+        }
+        return render(request, "tickets/view_ticket.html", context)
+    except Ticket.DoesNotExist:
+        messages.error(request, "Ticket not found")
+        return redirect("all_tickets")
 
 @login_required_with_message
 def view_ticket_detail(request, ticket_id):
@@ -332,23 +392,36 @@ def view_ticket_detail(request, ticket_id):
 @login_required_with_message
 def save_ticket(request):
     if request.method == "POST":
-        data = json.loads(request.body)
-        ticket_id = data.get("ticket_id")
-        assignee = data.get("assignee")
-        comment = data.get("comment")
-        last_status = data.get("last_status")
-        subject = data.get("subject")
-        brand = data.get("brand")
-        attached_files = data.get("attached_files")
-        ccs = data.get("ccs")
-        priority = data.get("priority")
+        try:
+            data = json.loads(request.body)  # Parse JSON data
 
-        with connection.cursor() as cursor:
-            cursor.execute("EXEC dbo._sp_InsertTicket %s, %s, %s, %s, %s, %s, %s, %s, %s", 
-                           [ticket_id, request.user.id, assignee, last_status, comment, subject, attached_files, brand, priority])
-        
-        return JsonResponse({"result": "Redirect", "url": "/dashboard"})
+            # Extract data from request
+            subject = data.get("subject")
+            description = data.get("description")
+            assignee_id = data.get("assignee")  # Expecting user ID
+            priority = data.get("priority", "Medium")
+            brand = data.get("brand", "")
 
+            # Validate required fields
+            if not subject or not description:
+                return JsonResponse({"error": "Subject and description are required"}, status=400)
+
+            # Create and save the ticket
+            ticket = Ticket.objects.create(
+                subject=subject,
+                description=description,
+                created_by=request.user,
+                priority=priority,
+                brand=brand,
+                assignee_id=assignee_id if assignee_id else None
+            )
+
+            return JsonResponse({"result": "Success", "ticket_id": ticket.id, "url": "/dashboard"})
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON data"}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
 @login_required_with_message
 def update_ticket(request):
     if request.method == "POST":
