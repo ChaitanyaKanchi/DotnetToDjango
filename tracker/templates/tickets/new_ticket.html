@@ -1,0 +1,149 @@
+{% extends 'shared/base_dashboard.html' %}
+{% load static %}
+
+{% block title %}New Ticket{% endblock %}
+
+{% block extra_css %}
+<style>
+    input, select, textarea {
+        max-width: 100%;
+    }
+    .p_btn {
+        background-color: transparent;
+        border: 1px solid #0673D9;
+        color: #0673D9;
+        padding: 4px 8px;
+        font-size: 12px;
+        cursor: pointer;
+        display: inline-block;
+        border-radius: .25rem;
+    }
+</style>
+{% endblock %}
+
+{% block sidebar_content %}
+<div class="mt-5 hidden-xs hidden_md"></div>
+<div class="px-2">
+    <div class="my-3">
+        <label>Assignee: <span class="text-danger">*</span></label>
+        <div class="ticket_select">
+            <select id="ddlassignee" class="form-control">
+                <option value="0">-- Select --</option>
+            </select>
+        </div>
+        <span id="spnddlassignee" class="text-danger" style="display:none;"></span>
+    </div>
+
+    <div class="my-3">
+        <label>Priority</label>
+        <div class="ticket_select">
+            <select id="ddlpriority" class="form-control">
+                <option value="0">-- Select --</option>
+            </select>
+        </div>
+        <span id="spnpriority" class="text-danger" style="display:none;"></span>
+    </div>
+
+    <div class="my-3">
+        <label>Brand</label>
+        <div class="ticket_select">
+            <select id="ddlbrand" class="form-control">
+                <option value="0">-- Select --</option>
+            </select>
+        </div>
+        <span id="spnddlbrand" class="text-danger" style="display:none;"></span>
+    </div>
+
+    <div class="my-3">
+        <label>CCs</label>
+        <div class="ticket_input">
+            <input type="text" id="txtccs" class="form-control" data-role="tagsinput">
+        </div>
+        <span id="spntxtccs" class="text-danger" style="display:none;"></span>
+    </div>
+</div>
+{% endblock %}
+
+{% block main_content %}
+<div class="card border-light shadow-sm pb-3 m-3">
+    <div class="top_section mt-1 d-flex shadow-sm align-items-start justify-content-between">
+        <div class="p-4 h5 m-0 text-primary">Add New Ticket</div>
+        <div class="align-self-center me-4">
+            <div class="dropdown-btnsubmit"></div>
+        </div>
+    </div>
+    <div class="main_wrapper">
+        <div class="main_block_ta border border-light rounded-2">
+            <div class="mb-3">
+                <label>Subject: <span class="text-danger">*</span></label>
+                <div class="ticket_input">
+                    <input type="text" id="txtSubject" class="form-control" style="width:100%; height: 40px;">
+                    <span class="text-danger" style="display:none;"></span>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label>Description: <span class="text-danger">*</span></label>
+                <div class="comment_area">
+                    <textarea id="txtDescription" class="comment_input" style="width:100%" rows="5"></textarea>
+                    <div class="attachment_block">
+                        <label class="attachment">
+                            <input type="file" hidden multiple>
+                            <span id="file_button" class="material-symbols-outlined" onclick="fnInv(this);">
+                                attach_file
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <span id="spndescerror" class="text-danger" style="display:none;"></span>
+            <progress id="fileProgress" style="display:none"></progress>
+            <div id="divattachment" style="display:inline-block"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'assets/js/ckeditor/ckeditor.js' %}"></script>
+<script src="{% static 'assets/js/tagsinput.js' %}"></script>
+<script>
+let foxnuttEditor;
+const toastEl = $('#toastMessage');
+const toast = new bootstrap.Toast(toastEl);
+
+$(document).ready(function() {
+    bindmaster();
+    $("#txtsearch").hide();
+
+    $('#txtccs').on('beforeItemAdd', function(event) {
+        if (fnValidateEmail(event.item) == false) {
+            $('#spntxtccs').text('Wrong email id: ' + event.item).show();
+            event.cancel = true;
+        } else {
+            event.cancel = false;
+            $('#spntxtccs').hide();
+        }
+    });
+});
+
+// Initialize CKEditor
+foxnuttEditor = CKEDITOR.replace('txtDescription', {
+    mentions: [{
+        marker: '@@',
+        feed: [/* ...feed items... */],
+        minChars: 0
+    }, {
+        marker: '#',
+        feed: [/* ...feed items... */],
+        minChars: 1,
+    }]
+});
+
+// File handling functions
+function fnInv(ctrl) {
+    $(ctrl).siblings('input[type=file]').click();
+}
+
+// ...rest of your JavaScript functions...
+</script>
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends 'shared/base_dashboard.html' %}
+{% load static %}
+
+{% block title %}View Ticket{% endblock %}
+
+{% block extra_css %}
+<style>
+    input, select, textarea {
+        max-width: 100%;
+    }
+    .commentbox {
+        border: 1px solid #ccc;
+        padding: 5px;
+    }
+    .highlight > img {
+        height: auto;
+        max-width: 100% !important;
+        vertical-align: bottom;
+    }
+    /* ...existing styles... */
+</style>
+{% endblock %}
+
+{% block sidebar_content %}
+<div class="mt-5 hidden-xs hidden_md"></div>
+<div class="px-2">
+    <div class="my-3">
+        <label>Assignee: <span class="text-danger">*</span></label>
+        <div class="ticket_select">
+            <select id="ddlassignee" class="form-control">
+                <option value="">-- Select --</option>
+            </select>
+        </div>
+        <span id="spnddlassignee" class="text-danger" style="display:none;"></span>
+    </div>
+
+    <div class="my-3">
+        <label>Priority</label>
+        <div class="ticket_select">
+            <select id="ddlpriority" class="form-control">
+                <option value="">-- Select --</option>
+            </select>
+        </div>
+        <span id="spnpriority" class="text-danger" style="display:none;"></span>
+    </div>
+
+    <div class="my-3">
+        <label>Brand</label>
+        <div class="ticket_select">
+            <select id="ddlbrand" class="form-control"></select>
+        </div>
+    </div>
+
+    <div class="my-3">
+        <label>CCs</label>
+        <div class="ticket_input">
+            <input type="text" id="txtccs" class="form-control" data-role="tagsinput">
+        </div>
+        <span id="spntxtccs" class="text-danger" style="display:none;"></span>
+    </div>
+</div>
+{% endblock %}
+
+{% block main_content %}
+<div class="card border-light shadow-sm pb-3 m-3">
+    <div class="top_section mt-1 d-flex shadow-sm align-items-start justify-content-between">
+        <div class="px-4 py-3">
+            <h5 class="ticket_no"></h5>
+            <h3 class="ticket_name"></h3>
+            <p class="ticket_info mb-0 text-secondary"></p>
+        </div>
+        <div class="align-self-center me-2">
+            <div class="btn-group dropdown-btnsubmit"></div>
+        </div>
+    </div>
+
+    <div class="main_wrapper">
+        <div class="main_block_ta border border-light rounded-2">
+            <div class="comment_section">
+                <ul class="nav comment_tabs" id="myTab" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link small active" onclick="changeeditor(0, this);">Public reply</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link small" onclick="changeeditor(1, this);">Internal note</a>
+                    </li>
+                </ul>
+                <div class="comment_area">
+                    <textarea id="txtDescription" class="comment_input"></textarea>
+                    <div class="attachment_block">
+                        <label class="attachment">
+                            <input type="file" style="display:none;" multiple>
+                            <span class="material-symbols-outlined" onclick="fnInv(this);">attach_file</span>
+                        </label>
+                    </div>
+                </div>
+                <span id="spndescerror" class="text-danger" style="display:none;"></span>
+                <progress id="fileProgress" style="display:none"></progress>
+                <div id="divattachment" style="display:inline-block"></div>
+            </div>
+            <div class="thread_section" id="divData"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'assets/js/ckeditor/ckeditor.js' %}"></script>
+<script>
+// ...existing JavaScript code...
+</script>
+{% endblock %}
