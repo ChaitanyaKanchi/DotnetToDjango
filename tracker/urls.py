@@ -3,6 +3,8 @@ from . import views
 # from .views import ticket_superuser as admin_views
 
 urlpatterns = [
+    #  Home URL
+    path('', views.home, name='home'),
     # Authentication URLs
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),

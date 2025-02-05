@@ -277,6 +277,10 @@ class Ticket(models.Model):
     brand = models.CharField(max_length=100, blank=True)
     ccs = models.TextField(blank=True)
 
+    def __str__(self):
+        # Change from user_id to id or pk
+        return f"{self.id} - {self.username}" if self.username else str(self.id)
+
 class TicketComment(models.Model):
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='comments')
     user = models.ForeignKey(User, on_delete=models.CASCADE)

@@ -38,6 +38,9 @@ from tracker import models  # Import your custom user model
 
 User = get_user_model()
 
+def home(request):
+    return render(request, 'home.html')
+
 def login_view(request):
     if request.method == "POST":
         email = request.POST.get("email")
