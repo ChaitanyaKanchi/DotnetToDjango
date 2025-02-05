@@ -14,19 +14,19 @@ urlpatterns = [
     path('new-account/', views.new_account, name='new_account'),
 
     # Ticket URLs
-    path('tickets/', views.all_tickets, name='all_tickets'),  # Use a proper view name
     path('ticket/new/', views.new_ticket, name='new_ticket'),
     path('tickets/all/', views.all_tickets, name='all_tickets'),
     path('tickets/search/', views.advanced_search, name='advanced_search'),
     path('ticket/<int:ticket_id>/', views.view_ticket, name='view_ticket'),
     path('ticket/<int:ticket_id>/detail/', views.view_ticket_detail, name='view_ticket_detail'),
-    path('ticket/save/', views.save_ticket, name='save_ticket'),
-    path('ticket/update/', views.update_ticket, name='update_ticket'),
+    path('ticket/<int:ticket_id>/update/', views.update_ticket, name='update_ticket'),
+    path('ticket/<int:ticket_id>/delete/', views.delete_ticket, name='delete_ticket'),
     path('user/settings/', views.user_settings, name='user_settings'),
 
     # MLoyalty URLs
     path('mloyal/', views.index, name='mloyal_index'),
     path('mloyal/dashboard/', views.mloyal_dashboard, name='mloyal_dashboard'),
+    path('mloyal/search/', views.mloyal_search_ticket, name='mloyal_search_ticket'),
     path('mloyal/ticket/<int:ticket_id>/', views.mloyal_view_ticket, name='mloyal_view_ticket'),
 
     # Super User URLs

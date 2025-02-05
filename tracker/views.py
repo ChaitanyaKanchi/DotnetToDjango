@@ -5,6 +5,7 @@
 from email.message import EmailMessage
 from django.conf import settings
 from django.shortcuts import render, redirect
+from django.db.models import Q
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -32,7 +33,8 @@ from .utils import generate_password_reset_token, verify_password_reset_token
 import re
 from datetime import datetime, timedelta
 from django.core.mail import EmailMessage
-from .models import UserDetail  # Import your custom user model
+from .models import UserDetail
+from tracker import models  # Import your custom user model
 
 User = get_user_model()
 
@@ -340,10 +342,9 @@ def new_ticket(request):
 
 @login_required_with_message
 def all_tickets(request):
-    tickets = Ticket.objects.all()  # Fetch all tickets
-
+    # Only show tickets created by the user
+    tickets = Ticket.objects.filter(created_by=request.user).order_by('-created_at')
     return render(request, "tracker/all_tickets.html", {"tickets": tickets})
-
 
 @login_required_with_message
 def advanced_search(request):
@@ -357,15 +358,8 @@ def advanced_search(request):
 @login_required_with_message  # Remove role_required decorator for now
 def view_ticket(request, ticket_id):
     try:
-        ticket = Ticket.objects.get(id=ticket_id)
-        
-        # Check if user has permission to view this ticket
-        if not (request.user.is_superuser or 
-                ticket.created_by == request.user or 
-                ticket.assigned_to == request.user):
-            messages.error(request, "You don't have permission to view this ticket.")
-            return redirect('dashboard')
-            
+        # Only allow viewing if user is the creator
+        ticket = Ticket.objects.get(id=ticket_id, created_by=request.user)
         attachments = TicketAttachment.objects.filter(ticket=ticket)
         comments = ticket.comments.all().order_by('-created_at')
 
@@ -375,11 +369,12 @@ def view_ticket(request, ticket_id):
             'comments': comments,
             'status_choices': Ticket.STATUS_CHOICES,
             'priority_choices': Ticket.PRIORITY_CHOICES,
-            'can_edit': request.user.is_superuser or ticket.assigned_to == request.user
+            'can_edit': True,  # Creator can always edit
+            'users': User.objects.filter(is_active=True)
         }
         return render(request, "tickets/view_ticket.html", context)
     except Ticket.DoesNotExist:
-        messages.error(request, "Ticket not found")
+        messages.error(request, "Ticket not found or you don't have permission to view it")
         return redirect("all_tickets")
 
 @login_required_with_message
@@ -422,25 +417,52 @@ def save_ticket(request):
             return JsonResponse({"error": "Invalid JSON data"}, status=400)
 
     return JsonResponse({"error": "Invalid request method"}, status=405)
-@login_required_with_message
-def update_ticket(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        ticket_id = data.get("ticket_id")
-        assignee = data.get("assignee")
-        comment = data.get("comment")
-        last_status = data.get("last_status")
-        subject = data.get("subject")
-        attached_files = data.get("attached_files")
-        ccs = data.get("ccs")
-        reply_type = data.get("reply_type")
-        priority = data.get("priority")
 
-        with connection.cursor() as cursor:
-            cursor.execute("EXEC dbo._sp_UpdateTicket %s, %s, %s, %s, %s, %s, %s, %s, %s", 
-                           [ticket_id, request.user.id, assignee, last_status, comment, subject, attached_files, ccs, priority])
+@login_required_with_message
+def update_ticket(request, ticket_id):
+    try:
+        ticket = Ticket.objects.get(id=ticket_id)
         
-        return JsonResponse({"result": "Redirect", "url": "/dashboard"})
+        # Only allow creator to edit the ticket
+        if ticket.created_by != request.user:
+            messages.error(request, "You don't have permission to edit this ticket.")
+            return redirect('view_ticket', ticket_id=ticket_id)
+
+        if request.method == "POST":
+            # Update ticket fields
+            ticket.subject = request.POST.get('subject', ticket.subject)
+            ticket.priority = request.POST.get('priority', ticket.priority)
+            ticket.status = int(request.POST.get('status', ticket.status))
+            
+            # Handle assignee
+            assignee_id = request.POST.get('assigned_to')
+            if assignee_id:
+                try:
+                    ticket.assigned_to = User.objects.get(id=assignee_id)
+                except User.DoesNotExist:
+                    ticket.assigned_to = None
+            else:
+                ticket.assigned_to = None
+
+            ticket.save()
+
+            messages.success(request, "Ticket updated successfully")
+            return redirect('view_ticket', ticket_id=ticket_id)
+
+    except Ticket.DoesNotExist:
+        messages.error(request, "Ticket not found")
+        return redirect('all_tickets')
+
+@login_required_with_message
+def delete_ticket(request, ticket_id):
+    try:
+        # Only allow creator to delete the ticket
+        ticket = Ticket.objects.get(id=ticket_id, created_by=request.user)
+        ticket.delete()
+        messages.success(request, f"Ticket #{ticket_id} deleted successfully")
+    except Ticket.DoesNotExist:
+        messages.error(request, "Ticket not found or you don't have permission to delete it")
+    return redirect('all_tickets')
 
 @login_required_with_message
 def user_settings(request):
@@ -509,7 +531,25 @@ def mloyal_dashboard(request):
 
 @login_required_with_message
 def mloyal_view_ticket(request, ticket_id):
-    return render(request, "mloyal_view_ticket.html", {"ticket_id": ticket_id})
+    try:
+        # Only allow viewing if user is the creator
+        ticket = Ticket.objects.get(id=ticket_id, created_by=request.user)
+        attachments = TicketAttachment.objects.filter(ticket=ticket)
+        comments = ticket.comments.all().order_by('-created_at')
+
+        context = {
+            'ticket': ticket,
+            'attachments': attachments,
+            'comments': comments,
+            'status_choices': Ticket.STATUS_CHOICES,
+            'priority_choices': Ticket.PRIORITY_CHOICES,
+            'can_edit': True,  # Creator can always edit
+            'users': User.objects.filter(is_active=True)
+        }
+        return render(request, "tickets/view_ticket.html", context)
+    except Ticket.DoesNotExist:
+        messages.error(request, f"Ticket #{ticket_id} not found or you don't have permission to view it")
+        return redirect('mloyal_index')
 
 @login_required_with_message
 def view_ticket_detail(request, ticket_id):
@@ -521,6 +561,22 @@ def view_ticket_detail(request, ticket_id):
 def dictfetchall(cursor):
     columns = [col[0] for col in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+@login_required_with_message
+def mloyal_search_ticket(request):
+    ticket_id = request.GET.get('ticket_id')
+    if ticket_id:
+        try:
+            # Verify ticket exists and belongs to current user
+            ticket = Ticket.objects.get(
+                models.Q(created_by=request.user) | models.Q(assigned_to=request.user),
+                id=ticket_id
+            )
+            return redirect('mloyal_view_ticket', ticket_id=ticket_id)
+        except Ticket.DoesNotExist:
+            messages.error(request, f"Ticket #{ticket_id} not found or you don't have permission to view it.")
+            return redirect('mloyal_index')
+    return redirect('mloyal_index')
 
 # this are ticket super user views
 
