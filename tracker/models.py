@@ -9,23 +9,50 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 
 # User Manager for Custom User Model
 class UserManager(BaseUserManager):
-    def create_user(self, user_id, user_name, password, role_id, **extra_fields):
+    def create_user(self, user_id, user_name, password, role=None, **extra_fields):
         if not user_id:
             raise ValueError("User ID is required")
         user = self.model(
             user_id=user_id,
             user_name=user_name,
-            role_id=role_id,
             **extra_fields
         )
         user.set_password(password)
+        if role:
+            user.role = role
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, user_id, user_name, password, role_id, **extra_fields):
+    def create_superuser(self, user_id, user_name, password, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        return self.create_user(user_id, user_name, password, role_id, **extra_fields)
+        try:
+            admin_role = Role.objects.get(id=Role.ADMIN)
+        except Role.DoesNotExist:
+            admin_role = Role.objects.create(id=Role.ADMIN, name='Admin')
+        return self.create_user(user_id, user_name, password, role=admin_role, **extra_fields)
+
+# Role Model
+class Role(models.Model):
+    ADMIN = 1
+    MANAGER = 2
+    CLIENT = 3
+    USER = 4
+    EMPLOYEE = 5
+    
+    ROLE_CHOICES = (
+        (ADMIN, 'Admin'),
+        (MANAGER, 'Manager'),
+        (CLIENT, 'Client'),
+        (USER, 'User'),
+        (EMPLOYEE, 'Employee'),
+    )
+    
+    id = models.PositiveSmallIntegerField(choices=ROLE_CHOICES, primary_key=True)
+    name = models.CharField(max_length=50)
+
+    def __str__(self):
+        return self.name
 
 # User Model
 class UserDetail(AbstractBaseUser, PermissionsMixin):
@@ -33,7 +60,6 @@ class UserDetail(AbstractBaseUser, PermissionsMixin):
     user_id = models.CharField(max_length=255, unique=True)
     user_name = models.CharField(max_length=255)
     password = models.CharField(max_length=255)
-    role_id = models.IntegerField()
     change_password = models.BooleanField(default=False)
     is_email_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -43,17 +69,65 @@ class UserDetail(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True)
+    department = models.CharField(max_length=100, null=True, blank=True)
 
     objects = UserManager()
 
     USERNAME_FIELD = "user_id"
-    REQUIRED_FIELDS = ["user_name", "role_id"]
+    REQUIRED_FIELDS = ["user_name"]
 
     def __str__(self):
         return self.user_name
 
+    def is_admin(self):
+        return self.role_id == Role.ADMIN
+        
+    def is_manager(self):
+        return self.role_id == Role.MANAGER
+        
+    def is_client(self):
+        return self.role_id == Role.CLIENT
+        
+    def is_basic_user(self):
+        return self.role_id == Role.USER
+    
+    def is_employee(self):
+        return self.role_id == Role.EMPLOYEE
+
+    def get_id(self):
+        """Return the row_id as the user's ID"""
+        return self.row_id
+
+    @property
+    def id(self):
+        """Alias for row_id to maintain compatibility"""
+        return self.row_id
+
     class Meta:
-        swappable = 'AUTH_USER_MODEL'
+        pass
+        # Add these custom reverse accessor names
+        permissions = (
+            # your custom permissions here if needed
+        )
+        verbose_name = 'user'
+        verbose_name_plural = 'users'
+
+    # Add these to override the default related_names
+    groups = models.ManyToManyField(
+        'auth.Group',
+        verbose_name='groups',
+        blank=True,
+        related_name='userdetail_set',
+        related_query_name='userdetail'
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        verbose_name='user permissions',
+        blank=True,
+        related_name='userdetail_set',
+        related_query_name='userdetail'
+    )
 
 # User Reset Code Model
 class UserResetCode(models.Model):
@@ -244,7 +318,11 @@ class TvUserListTree(models.Model):
     count = models.IntegerField()
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='profile'
+    )
     reset_code = models.CharField(max_length=100, blank=True)
     activation_code = models.CharField(max_length=100, blank=True)
     is_email_verified = models.BooleanField(default=False)
@@ -268,8 +346,17 @@ class Ticket(models.Model):
     id = models.AutoField(primary_key=True)  # Changed from ticket_id
     subject = models.CharField(max_length=200)
     description = models.TextField()
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_tickets')
-    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='assigned_tickets')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='created_tickets'
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='assigned_tickets'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     status = models.IntegerField(choices=STATUS_CHOICES, default=1)
@@ -283,14 +370,20 @@ class Ticket(models.Model):
 
 class TicketComment(models.Model):
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='comments')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE
+    )
     comment = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     is_internal = models.BooleanField(default=False)
 
 class TicketAttachment(models.Model):
-    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='attachments')
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='attachments')    
     file_name = models.CharField(max_length=255)
     file = models.FileField(upload_to='ticket_attachments/')
-    uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE
+    )
     uploaded_at = models.DateTimeField(auto_now_add=True)

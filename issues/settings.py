@@ -179,6 +179,8 @@ LOGOUT_REDIRECT_URL = 'login'
 JWT_SECRET_KEY = SECRET_KEY
 JWT_ALGORITHM = 'HS256'
 
+# Add this line to specify the custom user model
+AUTH_USER_MODEL = 'tracker.UserDetail'
 
 # Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

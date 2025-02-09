@@ -1,0 +1,110 @@
+{% extends 'admin/base_admin.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Admin Dashboard</h1>
+    
+    <!-- Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Users</h5>
+                    <h2>{{ total_users }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Active Tickets</h5>
+                    <h2>{{ total_tickets }}</h2>
+                </div>
+            </div>
+        </div>
+        <!-- Add more metric cards -->
+    </div>
+
+    <!-- User Management Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>User Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        {% for metric in user_metrics %}
+                        <tr>
+                            <td>{{ metric.role__name|default:"No Role" }}</td>
+                            <td>{{ metric.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Ticket Status</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        {% for metric in ticket_metrics %}
+                        <tr>
+                            {% with status_display=metric.status|stringformat:"s" %}
+                            <td>
+                                {% for choice in ticket.STATUS_CHOICES %}
+                                    {% if choice.0|stringformat:"s" == status_display %}
+                                        {{ choice.1 }}
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            {% endwith %}
+                            <td>{{ metric.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Recent Tickets</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Subject</th>
+                                <th>Created By</th>
+                                <th>Status</th>
+                                <th>Created At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ticket in recent_tickets %}
+                            <tr>
+                                <td>{{ ticket.id }}</td>
+                                <td>{{ ticket.subject }}</td>
+                                <td>{{ ticket.created_by.username }}</td>
+                                <td>{{ ticket.get_status_display }}</td>
+                                <td>{{ ticket.created_at }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

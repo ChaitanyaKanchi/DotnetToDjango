@@ -15,25 +15,19 @@ def role_required(allowed_roles):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
-            # Check if user is authenticated
             if not request.user.is_authenticated:
                 messages.error(request, 'Please login to continue.')
                 return redirect('login')
             
-            # Allow superusers to access everything
-            if request.user.is_superuser:
+            if not hasattr(request.user, 'role'):
+                messages.error(request, 'User role not configured.')
+                return redirect('login')
+                
+            if request.user.is_superuser or request.user.role.id in allowed_roles:
                 return view_func(request, *args, **kwargs)
-            
-            # For regular users, check if they have UserProfile with role
-            try:
-                user_profile = request.user.userdetail
-                if user_profile.role_id in allowed_roles:
-                    return view_func(request, *args, **kwargs)
-            except:
-                pass
-            
+                
             messages.error(request, 'You do not have permission to access this page.')
-            return redirect('dashboard')
+            return redirect('role_based_dashboard')
             
         return wrapper
     return decorator

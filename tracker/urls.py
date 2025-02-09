@@ -47,11 +47,26 @@ urlpatterns = [
     path('template/ticket/rows/', views.ticket_rows_template, name='ticket_rows_template'),
     path('template/reset-password/', views.reset_password_template, name='reset_password_template'),
     
-    # # Ticket Super User URLs 
-    # path('admin/home/', admin_views.HomeView.as_view(), name='admin_home'),
-    # path('admin/dashboard/', admin_views.DashboardView.as_view(), name='admin_dashboard'),
-    # path('admin/analytics/', admin_views.AnalyticsView.as_view(), name='admin_analytics'),
-    # path('admin/analytics/detail/<int:id>/', admin_views.AnalyticsDetailView.as_view(), name='admin_analytics_detail'),
-    # path('admin/tickets/data/', admin_views.TicketDataView.as_view(), name='admin_ticket_data'),
-    # path('admin/tickets/summary/', admin_views.DashboardSummaryView.as_view(), name='admin_dashboard_summary'),
+    # Role-based dashboard URLs
+    path('dashboard/', views.role_based_dashboard, name='role_based_dashboard'),
+    path('admin/dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('manager/dashboard/', views.manager_dashboard, name='manager_dashboard'),
+    path('client/dashboard/', views.client_dashboard, name='client_dashboard'),
+    path('user/dashboard/', views.user_dashboard, name='user_dashboard'),
+    path('employee/dashboard/', views.employee_dashboard, name='employee_dashboard'),
+
+    # User Management URLs
+    path('admin/users/', views.user_list, name='user_list'),
+    path('admin/users/add/', views.add_user, name='add_user'),
+    path('admin/users/add-client/', views.add_client, name='add_client'),
+    path('admin/users/add-manager/', views.add_manager, name='add_manager'),
+    path('admin/users/add-employee/', views.add_employee, name='add_employee'),
+    path('admin/users/add-admin/', views.add_admin, name='add_admin'),
+    path('admin/users/<int:user_id>/edit/', views.edit_user, name='edit_user'),
+    path('admin/users/<int:user_id>/delete/', views.delete_user, name='delete_user'),
+    path('admin/users/search/', views.search_users, name='search_users'),
+
+    # Settings URLs
+    path('settings/', views.user_settings, name='user_settings'),
+    path('admin/settings/', views.admin_settings, name='admin_settings'),
 ]
