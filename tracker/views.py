@@ -20,7 +20,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 import jwt
 from .models import (
-    Role,
+    Role,  # Add this import
     PasswordResetToken, 
     Ticket, 
     UserProfile, 
@@ -31,6 +31,7 @@ from .models import (
 from .decorators import login_required_with_message, role_required, superuser_required
 from django.views.generic import TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views import View
 from django.utils.decorators import method_decorator
 from django.template.loader import render_to_string
 from django.http import HttpResponse
@@ -57,8 +58,6 @@ def role_based_dashboard(request):
         return redirect('manager_dashboard')
     elif request.user.is_client():
         return redirect('client_dashboard')
-    elif request.user.is_employee():
-        return redirect('employee_dashboard')
     else:
         return redirect('user_dashboard')
 
@@ -89,35 +88,18 @@ def admin_dashboard(request):
     }
     return render(request, 'dashboards/admin_dashboard.html', context)
 
-# def manager_dashboard(request):
-#     department = request.user.department
-#     context = {
-#         'department_users': UserDetail.objects.filter(department=department),
-#         'department_tickets': Ticket.objects.filter(
-#             Q(created_by__userdetail__department=department) |
-#             Q(assigned_to__userdetail__department=department)
-#         ),
-#         'team_performance': calculate_team_performance(department)
-#     }
-#     return render(request, 'dashboards/manager_dashboard.html', context)
 @role_required([Role.MANAGER])
 def manager_dashboard(request):
-    return render(request, 'dashboards/manager_dashboard.html')
-
-
-@role_required([Role.EMPLOYEE])
-def employee_dashboard(request):
-    return render(request, 'dashboards/employee_dashboard.html')
-
-# def employee_dashboard(request):
-#     department = request.user.department
-#     context = {
-#         'department_tickets': Ticket.objects.filter(
-#             Q(created_by__userdetail__department=department) |
-#             Q(assigned_to__userdetail__department=department)
-#         )
-#     }
-
+    department = request.user.department
+    context = {
+        'department_users': UserDetail.objects.filter(department=department),
+        'department_tickets': Ticket.objects.filter(
+            Q(created_by__userdetail__department=department) |
+            Q(assigned_to__userdetail__department=department)
+        ),
+        'team_performance': calculate_team_performance(department)
+    }
+    return render(request, 'dashboards/manager_dashboard.html', context)
 
 @role_required([Role.CLIENT])
 def client_dashboard(request):
@@ -170,8 +152,6 @@ def login_view(request):
                     return redirect('manager_dashboard')
                 elif user.role.id == Role.CLIENT:
                     return redirect('client_dashboard')
-                elif user.role.id == Role.EMPLOYEE:
-                    return redirect('employee_dashboard')
             
             # Default redirect for basic users
             return redirect('user_dashboard')
@@ -903,12 +883,12 @@ class TicketDataView(LoginRequiredMixin, View):
 
 @role_required([Role.ADMIN])
 def add_user(request):
-    """Add new basic user"""
     if request.method == "POST":
-        email = request.POST.get('email')
+        user_id = request.POST.get('user_id')
         user_name = request.POST.get('user_name')
         password = request.POST.get('password')
         confirm_password = request.POST.get('confirm_password')
+        role_id = request.POST.get('role')
         department = request.POST.get('department')
 
         if password != confirm_password:
@@ -916,12 +896,12 @@ def add_user(request):
             return redirect('add_user')
 
         try:
-            # Automatically set role as basic user
-            role = Role.objects.get(id=Role.USER)
+            # Get the role
+            role = Role.objects.get(id=role_id)
 
-            # Create user
+            # Create the user
             user = UserDetail.objects.create_user(
-                user_id=email,
+                user_id=user_id,
                 user_name=user_name,
                 password=password,
                 role=role,
@@ -929,240 +909,34 @@ def add_user(request):
                 is_active=True
             )
 
-            messages.success(request, f"Successfully created basic user: {user_name}")
-            return redirect('user_list')
+            messages.success(request, f"Successfully created {role.name}: {user_name}")
+            return redirect('admin_dashboard')
 
         except Exception as e:
             messages.error(request, f"Error creating user: {str(e)}")
             return redirect('add_user')
 
     context = {
-        'title': 'Add User',
-        'role_type': 'User',
-        'show_department': False
-    }
-    return render(request, 'admin/add_user.html', context)
-
-@role_required([Role.ADMIN])
-def add_admin(request):
-    """Add new admin user"""
-    if request.method == "POST":
-        email = request.POST.get('email')
-        user_name = request.POST.get('user_name')
-        password = request.POST.get('password')
-        confirm_password = request.POST.get('confirm_password')
-
-        if password != confirm_password:
-            messages.error(request, "Passwords do not match.")
-            return redirect('add_admin')
-
-        try:
-            # Automatically set role as admin
-            role = Role.objects.get(id=Role.ADMIN)
-
-            # Create admin user
-            user = UserDetail.objects.create_user(
-                user_id=email,
-                user_name=user_name,
-                password=password,
-                role=role,
-                is_active=True,
-                is_staff=True
-            )
-
-            messages.success(request, f"Successfully created admin: {user_name}")
-            return redirect('user_list')
-
-        except Exception as e:
-            messages.error(request, f"Error creating admin: {str(e)}")
-            return redirect('add_admin')
-
-    context = {
-        'title': 'Add Admin',
-        'role_type': 'Admin',
-        'show_department': False
+        'roles': Role.ROLE_CHOICES
     }
     return render(request, 'admin/add_user.html', context)
 
 @role_required([Role.ADMIN])
 def add_employee(request):
-    """Add new employee"""
-    if request.method == "POST":
-        email = request.POST.get('email')
-        user_name = request.POST.get('user_name')
-        password = request.POST.get('password')
-        confirm_password = request.POST.get('confirm_password')
-        department = request.POST.get('department')
-
-        if not department:
-            messages.error(request, "Department is required for employees.")
-            return redirect('add_employee')
-
-        if password != confirm_password:
-            messages.error(request, "Passwords do not match.")
-            return redirect('add_employee')
-
-        try:
-            # Automatically set role as employee
-            role, created = Role.objects.get_or_create(id=Role.EMPLOYEE, defaults={'name': 'Employee'})
-
-            # Create employee
-            user = UserDetail.objects.create_user(
-                user_id=email,
-                user_name=user_name,
-                password=password,
-                role=role,
-                department=department,
-                is_active=True
-            )
-
-            messages.success(request, f"Successfully created employee: {user_name}")
-            return redirect('user_list')
-
-        except Exception as e:
-            messages.error(request, f"Error creating employee: {str(e)}")
-            return redirect('add_employee')
-
-    context = {
-        'title': 'Add Employee',
-        'role_type': 'Employee',
-        'show_department': True
-    }
-    return render(request, 'admin/add_user.html', context)
+    # Pre-select MANAGER role
+    if request.method == "GET":
+        context = {
+            'roles': Role.ROLE_CHOICES,
+            'selected_role': Role.MANAGER
+        }
+    return redirect('add_user')
 
 @role_required([Role.ADMIN])
 def add_client(request):
-    """Add new client"""
-    if request.method == "POST":
-        email = request.POST.get('email')
-        user_name = request.POST.get('user_name')
-        password = request.POST.get('password')
-        confirm_password = request.POST.get('confirm_password')
-
-        if password != confirm_password:
-            messages.error(request, "Passwords do not match.")
-            return redirect('add_client')
-
-        try:
-            # Automatically set role as client
-            role = Role.objects.get(id=Role.CLIENT)
-
-            # Create client
-            user = UserDetail.objects.create_user(
-                user_id=email,
-                user_name=user_name,
-                password=password,
-                role=role,
-                is_active=True
-            )
-
-            messages.success(request, f"Successfully created client: {user_name}")
-            return redirect('user_list')
-
-        except Exception as e:
-            messages.error(request, f"Error creating client: {str(e)}")
-            return redirect('add_client')
-
-    context = {
-        'title': 'Add Client',
-        'role_type': 'Client',
-        'show_department': False
-    }
-    return render(request, 'admin/add_user.html', context)
-
-
-@role_required([Role.ADMIN])
-def add_manager(request):
-    """Add new manager"""
-    if request.method == "POST":
-        email = request.POST.get('email')
-        user_name = request.POST.get('user_name')
-        password = request.POST.get('password')
-        confirm_password = request.POST.get('confirm_password')
-
-        if password != confirm_password:
-            messages.error(request, "Passwords do not match.")
-            return redirect('add_client')
-
-        try:
-            # Automatically set role as manager
-            role = Role.objects.get(id=Role.MANAGER)
-
-            # Create client
-            user = UserDetail.objects.create_user(
-                user_id=email,
-                user_name=user_name,
-                password=password,
-                role=role,
-                is_active=True
-            )
-
-            messages.success(request, f"Successfully created manager: {user_name}")
-            return redirect('user_list')
-
-        except Exception as e:
-            messages.error(request, f"Error creating client: {str(e)}")
-            return redirect('add_manager')
-
-    context = {
-        'title': 'Add Manager',
-        'role_type': 'Manager',
-        'show_department': False
-    }
-    return render(request, 'admin/add_user.html', context)
-
-
-@role_required([Role.ADMIN])
-def user_list(request):
-    users = UserDetail.objects.all().order_by('user_name')
-    return render(request, 'admin/user_list.html', {'users': users})
-
-@role_required([Role.ADMIN])
-def search_users(request):
-    query = request.GET.get('q', '')
-    users = UserDetail.objects.filter(
-        Q(user_name__icontains=query) | 
-        Q(user_id__icontains(query))
-    )
-    return render(request, 'admin/user_list.html', {'users': users})
-
-@role_required([Role.ADMIN])
-def edit_user(request, user_id):
-    try:
-        user = UserDetail.objects.get(row_id=user_id)
-        if request.method == "POST":
-            # Handle user update
-            user.user_name = request.POST.get('user_name')
-            user.role_id = request.POST.get('role')
-            user.department = request.POST.get('department')
-            user.is_active = request.POST.get('is_active') == 'true'
-            user.save()
-            messages.success(request, f"User {user.user_name} updated successfully")
-            return redirect('user_list')
-    except UserDetail.DoesNotExist:
-        messages.error(request, "User not found")
-        return redirect('user_list')
-    
-    context = {
-        'user': user,
-        'roles': Role.ROLE_CHOICES
-    }
-    return render(request, 'admin/edit_user.html', context)
-
-@role_required([Role.ADMIN])
-def delete_user(request, user_id):
-    try:
-        user = UserDetail.objects.get(row_id=user_id)
-        user_name = user.user_name
-        user.delete()
-        messages.success(request, f"User {user_name} deleted successfully")
-    except UserDetail.DoesNotExist:
-        messages.error(request, "User not found")
-    return redirect('user_list')
-
-@role_required([Role.ADMIN])
-def admin_settings(request):
-    # Add admin settings implementation
-    return render(request, 'admin/settings.html')
-
-
+    # Pre-select CLIENT role
+    if request.method == "GET":
+        context = {
+            'roles': Role.ROLE_CHOICES,
+            'selected_role': Role.CLIENT
+        }
+    return redirect('add_user')

@@ -82,4 +82,3 @@ class Command(BaseCommand):
                 id=role_id,
                 defaults={'name': role_name}
             )
-    
